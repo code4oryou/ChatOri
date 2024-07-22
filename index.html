@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ChatOri</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            color: white;
+        }
+
+        .chat-app {
+            display: flex;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            overflow: hidden;
+            width: 80%;
+            max-width: 1200px;
+            height: 80%;
+        }
+
+        .users-section {
+            width: 25%;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-right: 1px solid #444;
+            overflow-y: auto;
+        }
+
+        .chat-section {
+            width: 75%;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+
+        .form-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .form-section input,
+        .form-section select,
+        .form-section button {
+            flex: 1;
+        }
+
+        input,
+        select,
+        button {
+            color: black;
+            /* Change text color to black */
+            background-color: white;
+            /* Change background color to white */
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        option {
+            color: black;
+            /* Ensure option text color is black */
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loginContainer" class="container">
+        <div>
+            <h1 class="font-bold text-green-500 text-3xl text-center mt-5">ChatOri</h1>
+            <div>
+                <h2 class="font-semibold text-xl text-center mt-5" id="logo">Chat app using Socket IO and Node JS</h2>
+            </div>
+            <form class="flex flex-col justify-center items-center mt-5" id="joinForm">
+                <input class="border border-gray-400 rounded-md mt-5 p-1" type="text" placeholder="Name" id="username">
+                <input class="border border-gray-400 rounded-md mt-5 p-1" type="text" placeholder="Room" id="room">
+                <button class="bg-blue-500 rounded-md p-2 text-white mt-5">Join Room</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="chatContainer" class="container" style="display: none;">
+        <div class="chat-app">
+            <div class="users-section">
+                <h2 class="text-2xl font-bold text-center mb-5" id="logo">ChatOri</h2>
+                <div id="messageArea" class="users-list"></div>
+            </div>
+            <div class="chat-section">
+                <div class="chat-box" id="chatBox"></div>
+                <form class="form-section" id="messageForm">
+                    <input class="border border-gray-400 rounded-md p-1" type="text" placeholder="Message" id="message">
+                    <select class="border border-gray-400 rounded-md p-1" id="recipient">
+                        <option value="">Broadcast</option>
+                    </select>
+                    <button class="bg-blue-500 rounded-md p-2 text-white">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = io();
+
+        let joinForm = document.getElementById('joinForm');
+        let messageForm = document.getElementById('messageForm');
+        let loginContainer = document.getElementById('loginContainer');
+        let chatContainer = document.getElementById('chatContainer');
+        let username = document.getElementById('username');
+        let room = document.getElementById('room');
+        let message = document.getElementById('message');
+        let recipient = document.getElementById('recipient');
+        let messageArea = document.getElementById("messageArea");
+        let chatBox = document.getElementById("chatBox");
+
+        joinForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            if (username.value && room.value) {
+                socket.emit('join room', { username: username.value, room: room.value });
+                loginContainer.style.display = 'none';
+                chatContainer.style.display = 'flex';
+            }
+        });
+
+        messageForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            if (message.value) {
+                socket.emit('send message', { recipientId: recipient.value, message: message.value });
+                message.value = "";
+                recipient.value = "";
+            }
+        });
+
+        socket.on("existing users", (users) => {
+            users.forEach(user => {
+                let name = document.createElement("p");
+                name.className = "chat-message";
+                name.style.backgroundColor = "grey";
+                name.textContent = user.username;
+                messageArea.appendChild(name);
+
+                let option = document.createElement("option");
+                option.value = user.socketId;
+                option.textContent = user.username;
+                recipient.appendChild(option);
+            });
+        });
+
+        socket.on("user joined", (data) => {
+            let name = document.createElement("p");
+            name.className = "chat-message";
+            name.style.backgroundColor = "green";
+            name.textContent = data.username + " joined the room";
+            messageArea.appendChild(name);
+
+            let option = document.createElement("option");
+            option.value = data.socketId;
+            option.textContent = data.username;
+            recipient.appendChild(option);
+        });
+
+        socket.on("send message", (data) => {
+            let chatContent = document.createElement("p");
+            chatContent.className = "chat-message";
+            chatContent.textContent = data.from + ": " + data.message + (data.private ? " (private)" : "");
+            chatBox.appendChild(chatContent);
+            chatBox.scrollTop = chatBox.scrollHeight; // Auto scroll to the bottom
+        });
+
+        socket.on("user left", (data) => {
+            let name = document.createElement("p");
+            name.className = "chat-message";
+            name.style.backgroundColor = "red";
+            name.textContent = data.username + " left the room";
+            messageArea.appendChild(name);
+
+            let options = recipient.options;
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value === data.socketId) {
+                    recipient.remove(i);
+                    break;
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
